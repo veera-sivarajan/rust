@@ -1197,7 +1197,6 @@ pub fn prohibit_assoc_item_binding(
     tcx: TyCtxt<'_>,
     binding: &hir::TypeBinding<'_>,
     segment: Option<(DefId, &hir::PathSegment<'_>, Span)>,
-    is_impl: bool,
 ) -> ErrorGuaranteed {
     let mut err = tcx.dcx().create_err(AssocTypeBindingNotAllowed {
         span: binding.span,
