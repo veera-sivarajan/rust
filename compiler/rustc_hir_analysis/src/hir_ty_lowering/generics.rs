@@ -456,7 +456,7 @@ pub(crate) fn check_generic_arg_count(
     if gen_pos != GenericArgPosition::Type
         && let Some(b) = gen_args.bindings.first()
     {
-        prohibit_assoc_item_binding(tcx, b, None);
+        prohibit_assoc_item_binding(tcx, b, None, false);
     }
 
     let explicit_late_bound =
