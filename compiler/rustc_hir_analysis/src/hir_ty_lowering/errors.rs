@@ -1337,10 +1337,10 @@ pub fn prohibit_assoc_item_binding(
                                 } else {
                                     (impl_block.generics.span.shrink_to_lo(), format!("<{snippet}>"))
                                 };
-                                err.span_suggestion_verbose(
-                                    param_span,
+                                let suggestions = vec![(param_span, suggestion), (binding.span, format!("{}", matching_param.name))];
+                                err.multipart_suggestion_verbose(
                                     format!("consider declaring the type parameter first"),
-                                    suggestion,
+                                    suggestions,
                                     Applicability::MaybeIncorrect,
                                 );
                             }

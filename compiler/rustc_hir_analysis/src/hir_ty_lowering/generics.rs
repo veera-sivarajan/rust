@@ -565,7 +565,6 @@ pub(crate) fn check_generic_arg_count(
                 .filter(|param| !has_self || param.index != 0)
                 .map(|param| param.name)
                 .collect();
-
             if bindings == bound_params {
                 params_are_binded = true;
             };
