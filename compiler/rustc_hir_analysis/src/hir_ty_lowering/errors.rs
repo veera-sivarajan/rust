@@ -1217,7 +1217,6 @@ pub fn prohibit_assoc_item_binding(
     // otherwise suggest the removal of the binding.
     if let Some((def_id, segment, _)) = segment
         && segment.args().parenthesized == hir::GenericArgsParentheses::No
-       
     {
         // Suggests removal of the offending binding
         let suggest_removal = |e: &mut Diag<'_>| {
@@ -1292,66 +1291,52 @@ pub fn prohibit_assoc_item_binding(
         // Check if the type has a generic param with the
         // same name as the assoc type name in type binding
         let generics = tcx.generics_of(def_id);
-        let matching_param =
-            generics.own_params.iter().find(|p| p.name == binding.ident.name);
+        let matching_param = generics.own_params.iter().find(|p| p.name == binding.ident.name);
 
         // Now emit the appropriate suggestion
         if let Some(matching_param) = matching_param {
             match binding.kind {
-                hir::TypeBindingKind::Equality { term } => {
-                    match (&matching_param.kind, term) {
-                        (GenericParamDefKind::Type { .. }, hir::Term::Ty(ty)) => {
-                            suggest_direct_use(&mut err, ty.span);
-                        }
-                        (GenericParamDefKind::Const { .. }, hir::Term::Const(c)) => {
-                            let span = tcx.hir().span(c.hir_id);
-                            suggest_direct_use(&mut err, span);
-                        }
-                        _ => suggest_removal(&mut err),
+                hir::TypeBindingKind::Equality { term } => match (&matching_param.kind, term) {
+                    (GenericParamDefKind::Type { .. }, hir::Term::Ty(ty)) => {
+                        suggest_direct_use(&mut err, ty.span);
                     }
+                    (GenericParamDefKind::Const { .. }, hir::Term::Const(c)) => {
+                        let span = tcx.hir().span(c.hir_id);
+                        suggest_direct_use(&mut err, span);
+                    }
+                    _ => suggest_removal(&mut err),
                 },
                 hir::TypeBindingKind::Constraint { .. } => {
-                    // for bound in bounds {
-                    // let parent_hir = tcx.parent_hir_id(binding.hir_id);
-                    if is_impl {
-                        if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(binding.span) {
-                            // let trait_name = tcx.def_path_str(def_id);
-                            // let enclosing_scope = tcx.get_enclosing_scope(binding.hir_id);
-                            // let my_span = tcx.hir().span_with_body(binding.hir_id);
-                            let my_impl = tcx.hir().parent_iter(binding.hir_id).find(|node| {
-                                if let (_, hir::Node::Item(item)) = node {
-                                    if let hir::ItemKind::Impl(impl_block) = item.kind {
-                                        let of_trait = impl_block.of_trait.unwrap().trait_def_id().unwrap();
-                                        of_trait == def_id
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                            }).unwrap().1;
-                            if let hir::Node::Item(item) = my_impl && let hir::ItemKind::Impl(impl_block) = item.kind {
-                                let (param_span, suggestion) = if let Some(param_span) = impl_block.generics.span_for_param_suggestion() {
-                                    (param_span, format!(", {snippet}"))
-                                } else {
-                                    (impl_block.generics.span.shrink_to_lo(), format!("<{snippet}>"))
-                                };
-                                let suggestions = vec![(param_span, suggestion), (binding.span, format!("{}", matching_param.name))];
-                                err.multipart_suggestion_verbose(
-                                    format!("consider declaring the type parameter first"),
-                                    suggestions,
-                                    Applicability::MaybeIncorrect,
-                                );
-                            }
-                            // err.help(format!("consider declaring the type parameter like: {suggestion}"));
-                        }
+                    let impl_block = tcx
+                        .hir()
+                        .parent_iter(binding.hir_id)
+                        .find_map(|(_, node)| node.impl_block());
+                    if let Some(impl_block) = impl_block
+                        && impl_block
+                            .of_trait
+                            .and_then(|trait_ref| trait_ref.trait_def_id())
+                            .is_some_and(|trait_def_id| trait_def_id == def_id)
+                        && let Ok(snippet) = tcx.sess.source_map().span_to_snippet(binding.span)
+                    {
+                        let (param_span, suggestion) = if let Some(param_span) =
+                            impl_block.generics.span_for_param_suggestion()
+                        {
+                            (param_span, format!(", {snippet}"))
+                        } else {
+                            (impl_block.generics.span.shrink_to_lo(), format!("<{snippet}>"))
+                        };
+                        let suggestions = vec![
+                            (param_span, suggestion),
+                            (binding.span, format!("{}", matching_param.name)),
+                        ];
+                        err.multipart_suggestion_verbose(
+                            format!("consider declaring the type parameter first"),
+                            suggestions,
+                            Applicability::MaybeIncorrect,
+                        );
                     }
-
-
-                    // }
                 }
             }
-            
         } else {
             suggest_removal(&mut err);
         }

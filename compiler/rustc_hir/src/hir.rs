@@ -3702,6 +3702,13 @@ impl<'hir> Node<'hir> {
         }
     }
 
+    pub fn impl_block(self) -> Option<&'hir Impl<'hir>> {
+        match self {
+            Node::Item(Item { kind: ItemKind::Impl(impl_block), .. }) => Some(impl_block),
+            _ => None,
+        }
+    }
+
     pub fn fn_sig(self) -> Option<&'hir FnSig<'hir>> {
         match self {
             Node::TraitItem(TraitItem { kind: TraitItemKind::Fn(fn_sig, _), .. })
