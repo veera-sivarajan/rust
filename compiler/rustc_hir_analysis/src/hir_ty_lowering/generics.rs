@@ -431,8 +431,6 @@ pub(crate) fn check_generic_arg_count(
     let gen_args = seg.args();
     let default_counts = gen_params.own_defaults();
     let param_counts = gen_params.own_counts();
-    // dbg!(gen_args);
-    // dbg!(&gen_params);
 
     // Subtracting from param count to ensure type params synthesized from `impl Trait`
     // cannot be explicitly specified.
@@ -539,7 +537,7 @@ pub(crate) fn check_generic_arg_count(
 
         let num_default_params = expected_max - expected_min;
 
-        let mut params_are_binded = false;
+        let mut all_params_are_binded = false;
         let gen_args_info = if provided > expected_max {
             invalid_args.extend(
                 gen_args.args[args_offset + expected_max..args_offset + provided]
@@ -558,15 +556,17 @@ pub(crate) fn check_generic_arg_count(
                 synth_provided,
             }
         } else {
-            let bindings: Vec<_> = gen_args.bindings.iter().map(|b| b.ident.name).collect();
-            let bound_params: Vec<_> = gen_params
+            let bind_arg_names: Vec<_> = gen_args.bindings.iter().map(|b| b.ident.name).collect();
+            let param_names: Vec<_> = gen_params
                 .own_params
                 .iter()
-                .filter(|param| !has_self || param.index != 0)
+                .filter(|param| !has_self || param.index != 0) // Assumes `Self` will always be the first parameter
                 .map(|param| param.name)
                 .collect();
-            if bindings == bound_params {
-                params_are_binded = true;
+            if bind_arg_names == param_names {
+                // We set this to true and delay emitting `WrongNumberOfGenericArgs`
+                // to provide a succinct error for cases like issue #113073
+                all_params_are_binded = true;
             };
 
             let num_missing_args = expected_max - provided;
@@ -590,7 +590,7 @@ pub(crate) fn check_generic_arg_count(
             def_id,
         )
         .diagnostic()
-        .emit_unless(gen_args.has_err() || params_are_binded);
+        .emit_unless(gen_args.has_err() || all_params_are_binded);
 
         Err(reported)
     };

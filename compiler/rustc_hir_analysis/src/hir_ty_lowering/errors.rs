@@ -1307,37 +1307,49 @@ pub fn prohibit_assoc_item_binding(
                     _ => suggest_removal(&mut err),
                 },
                 hir::TypeBindingKind::Constraint { bounds } => {
+                    // Suggest `impl<T: Bound> Trait<T> for Foo` when finding
+                    // `impl Trait<T: Bound> for Foo`
+
+                    // Get the parent impl block based on the binding we have
+                    // and the trait DefId
                     let impl_block = tcx
                         .hir()
                         .parent_iter(binding.hir_id)
-                        .find_map(|(_, node)| node.impl_block());
+                        .find_map(|(_, node)| node.impl_block_of_trait(def_id));
+
+                    let type_with_constraints = tcx.sess.source_map().span_to_snippet(binding.span);
+
                     if let Some(impl_block) = impl_block
-                        && impl_block
-                            .of_trait
-                            .and_then(|trait_ref| trait_ref.trait_def_id())
-                            .is_some_and(|trait_def_id| trait_def_id == def_id)
-                        && let Ok(snippet) = tcx.sess.source_map().span_to_snippet(binding.span)
+                        && let Ok(type_with_constraints) = type_with_constraints
                     {
-                        let lifetimes: String = bounds.iter().filter_map(|bound| {
-                            if let hir::GenericBound::Outlives(lifetime) = bound {
-                                Some(format!("{}, ", lifetime))
-                            } else {
-                                None
-                            }
-                        }).collect();
-                        let (param_span, suggestion) = if let Some(param_span) =
+                        // Filter out the lifetime parameters because
+                        // they should be declared before the type parameter
+                        let lifetimes: String = bounds
+                            .iter()
+                            .filter_map(|bound| {
+                                if let hir::GenericBound::Outlives(lifetime) = bound {
+                                    Some(format!("{lifetime}, "))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        // Figure out a span and suggestion string based on
+                        // whether there are any existing parameters
+                        let param_decl = if let Some(param_span) =
                             impl_block.generics.span_for_param_suggestion()
                         {
-                            (param_span, format!(", {lifetimes}{snippet}"))
+                            (param_span, format!(", {lifetimes}{type_with_constraints}"))
                         } else {
-                            (impl_block.generics.span.shrink_to_lo(), format!("<{lifetimes}{snippet}>"))
+                            (
+                                impl_block.generics.span.shrink_to_lo(),
+                                format!("<{lifetimes}{type_with_constraints}>"),
+                            )
                         };
-                        let suggestions = vec![
-                            (param_span, suggestion),
-                            (binding.span, format!("{}", matching_param.name)),
-                        ];
+                        let suggestions =
+                            vec![param_decl, (binding.span, format!("{}", matching_param.name))];
                         err.multipart_suggestion_verbose(
-                            format!("consider declaring the type parameter"),
+                            format!("declare the type parameter right after the `impl` keyword"),
                             suggestions,
                             Applicability::MaybeIncorrect,
                         );

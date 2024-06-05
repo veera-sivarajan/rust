@@ -3702,9 +3702,17 @@ impl<'hir> Node<'hir> {
         }
     }
 
-    pub fn impl_block(self) -> Option<&'hir Impl<'hir>> {
+    /// Get a `hir::Impl` if the node is an impl block for the given `trait_def_id`.
+    pub fn impl_block_of_trait(self, trait_def_id: DefId) -> Option<&'hir Impl<'hir>> {
         match self {
-            Node::Item(Item { kind: ItemKind::Impl(impl_block), .. }) => Some(impl_block),
+            Node::Item(Item { kind: ItemKind::Impl(impl_block), .. })
+                if impl_block
+                    .of_trait
+                    .and_then(|trait_ref| trait_ref.trait_def_id())
+                    .is_some_and(|trait_id| trait_id == trait_def_id) =>
+            {
+                Some(impl_block)
+            }
             _ => None,
         }
     }
