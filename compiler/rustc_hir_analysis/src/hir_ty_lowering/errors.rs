@@ -1306,7 +1306,7 @@ pub fn prohibit_assoc_item_binding(
                     }
                     _ => suggest_removal(&mut err),
                 },
-                hir::TypeBindingKind::Constraint { .. } => {
+                hir::TypeBindingKind::Constraint { bounds } => {
                     let impl_block = tcx
                         .hir()
                         .parent_iter(binding.hir_id)
@@ -1318,19 +1318,26 @@ pub fn prohibit_assoc_item_binding(
                             .is_some_and(|trait_def_id| trait_def_id == def_id)
                         && let Ok(snippet) = tcx.sess.source_map().span_to_snippet(binding.span)
                     {
+                        let lifetimes: String = bounds.iter().filter_map(|bound| {
+                            if let hir::GenericBound::Outlives(lifetime) = bound {
+                                Some(format!("{}, ", lifetime))
+                            } else {
+                                None
+                            }
+                        }).collect();
                         let (param_span, suggestion) = if let Some(param_span) =
                             impl_block.generics.span_for_param_suggestion()
                         {
-                            (param_span, format!(", {snippet}"))
+                            (param_span, format!(", {lifetimes}{snippet}"))
                         } else {
-                            (impl_block.generics.span.shrink_to_lo(), format!("<{snippet}>"))
+                            (impl_block.generics.span.shrink_to_lo(), format!("<{lifetimes}{snippet}>"))
                         };
                         let suggestions = vec![
                             (param_span, suggestion),
                             (binding.span, format!("{}", matching_param.name)),
                         ];
                         err.multipart_suggestion_verbose(
-                            format!("consider declaring the type parameter first"),
+                            format!("consider declaring the type parameter"),
                             suggestions,
                             Applicability::MaybeIncorrect,
                         );
