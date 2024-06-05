@@ -531,6 +531,7 @@ pub(crate) fn check_generic_arg_count(
 
         let num_default_params = expected_max - expected_min;
 
+        let mut all_params_are_binded = false;
         let gen_args_info = if provided > expected_max {
             invalid_args.extend((expected_max..provided).map(|i| i + args_offset));
             let num_redundant_args = provided - expected_max;
@@ -545,6 +546,19 @@ pub(crate) fn check_generic_arg_count(
                 synth_provided,
             }
         } else {
+            let bind_arg_names: Vec<_> = gen_args.bindings.iter().map(|b| b.ident.name).collect();
+            let param_names: Vec<_> = gen_params
+                .own_params
+                .iter()
+                .filter(|param| !has_self || param.index != 0) // Assumes `Self` will always be the first parameter
+                .map(|param| param.name)
+                .collect();
+            if bind_arg_names == param_names {
+                // We set this to true and delay emitting `WrongNumberOfGenericArgs`
+                // to provide a succinct error for cases like issue #113073
+                all_params_are_binded = true;
+            };
+
             let num_missing_args = expected_max - provided;
 
             GenericArgsInfo::MissingTypesOrConsts {
@@ -556,19 +570,17 @@ pub(crate) fn check_generic_arg_count(
 
         debug!(?gen_args_info);
 
-        let reported = gen_args.has_err().unwrap_or_else(|| {
-            WrongNumberOfGenericArgs::new(
-                tcx,
-                gen_args_info,
-                seg,
-                gen_params,
-                params_offset,
-                gen_args,
-                def_id,
-            )
-            .diagnostic()
-            .emit()
-        });
+        let reported = WrongNumberOfGenericArgs::new(
+            tcx,
+            gen_args_info,
+            seg,
+            gen_params,
+            params_offset,
+            gen_args,
+            def_id,
+        )
+        .diagnostic()
+        .emit_unless(gen_args.has_err() || all_params_are_binded);
 
         Err(reported)
     };
