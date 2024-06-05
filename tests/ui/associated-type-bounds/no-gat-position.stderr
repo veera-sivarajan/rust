@@ -2,7 +2,16 @@ error[E0229]: associated item constraints are not allowed here
   --> $DIR/no-gat-position.rs:6:56
    |
 LL |     fn next<'a>(&'a mut self) -> Option<Self::Item<'a, As1: Copy>>;
+<<<<<<< HEAD
    |                                                        ^^^^^^^^^ associated item constraint not allowed here
+=======
+   |                                                        ^^^^^^^^^ associated type not allowed here
+   |
+help: consider removing this type binding
+   |
+LL |     fn next<'a>(&'a mut self) -> Option<Self::Item<'a, As1: Copy>>;
+   |                                                      ~~~~~~~~~~~
+>>>>>>> df8beaf36b8 (Update Tests)
 
 error: aborting due to 1 previous error
 
